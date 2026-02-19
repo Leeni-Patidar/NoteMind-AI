@@ -1,0 +1,10 @@
+streamlit
+crewai
+langchain
+ollama
+faiss-cpu
+sentence-transformers
+duckduckgo-search
+python-docx
+reportlab
+bcrypt

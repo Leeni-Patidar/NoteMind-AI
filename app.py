@@ -1,163 +1,146 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.prebuilt import create_react_agent
-from langgraph_swarm import create_handoff_tool, create_swarm
 import os
+os.environ["CREWAI_DISABLE_TELEMETRY"] = "true"
 
-# -------------------------
-# Gemini API Key
-# -------------------------
-os.environ["GOOGLE_API_KEY"] = "AIzaSyDsN-2KwLKJ3pipgoLBRQ-RvJ48j6UDUa4"
+import streamlit as st
+from agents.crew_setup import run_notes, run_questions
+from auth.google_auth import google_login
 
-# -------------------------
-# Initialize Gemini model
-# -------------------------
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0
-)
+st.set_page_config(page_title="AI Education System", layout="centered")
 
-# -------------------------
-# Tools
-# -------------------------
-def question_answering(question: str):
-    """Answers general knowledge questions."""
-    return llm.invoke(question).content
+# ---------- CSS ----------
+st.markdown("""
+<style>
 
-def science_tool(question: str):
-    """Answers science-related questions."""
-    return llm.invoke(question).content
+.block-container {
+    padding-top: 2rem;
+}
 
-def extract_language_and_text(request: str):
-    request = request.lower()
-    to_patterns = [" to ", " in ", " into "]
-    target_language = None
-    text = request
+.top-bar {
+    display: flex;
+    justify-content: flex-end;
+}
 
-    for pattern in to_patterns:
-        if pattern in request:
-            parts = request.split(pattern)
-            if len(parts) == 2:
-                text = parts[0]
-                target_language = parts[1].strip()
-                break
+.title {
+    text-align: center;
+    font-size: 32px;
+    font-weight: 600;
+    margin-top: 100px;
+    margin-bottom: 20px;
+}
 
-    text = text.replace("translate", "").replace("say", "").strip()
-    return text.strip(), target_language
+.chat-box {
+    max-width: 700px;
+    margin: auto;
+}
 
-def translate_text(request: str):
-    """Translates text to a specified language."""
-    if any(x in request.lower() for x in [
-        "help with", "can you", "need translation", "translate something"
-    ]):
-        return (
-            "I can help you translate. Use:\n"
-            "'translate [text] to [language]' or '[text] in [language]'"
+.user {
+    background-color: #DCF8C6;
+    padding: 12px;
+    border-radius: 10px;
+    margin-top: 10px;
+    text-align: right;
+}
+
+.bot {
+    background-color: #F1F0F0;
+    padding: 12px;
+    border-radius: 10px;
+    margin-top: 10px;
+}
+
+.stTextInput > div > div > input {
+    font-size: 16px;
+    padding: 12px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+# ---------- SESSION ----------
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+
+# ---------- TOP BAR LOGIN ----------
+col1, col2 = st.columns([8,1])
+
+with col2:
+    auth_url = google_login()
+    st.link_button("Login with Google", auth_url)
+
+
+# ---------- TITLE ----------
+st.markdown('<div class="title">What’s in your mind today?</div>', unsafe_allow_html=True)
+
+
+# ---------- CHAT DISPLAY ----------
+st.markdown('<div class="chat-box">', unsafe_allow_html=True)
+
+for msg in st.session_state.messages:
+
+    if msg["role"] == "user":
+        st.markdown(
+            f'<div class="user">{msg["content"]}</div>',
+            unsafe_allow_html=True
         )
 
-    text, target_language = extract_language_and_text(request)
-
-    if not target_language:
-        return (
-            f"I need the target language to translate: '{text}'. "
-            "Please specify the language in your next message."
+    else:
+        st.markdown(
+            f'<div class="bot">{msg["content"]}</div>',
+            unsafe_allow_html=True
         )
 
-    prompt = f"Translate the following text to {target_language}:\n{text}"
-    return llm.invoke(prompt).content
+st.markdown('</div>', unsafe_allow_html=True)
 
-# -------------------------
-# Agents
-# -------------------------
-question_answering_agent = create_react_agent(
-    model=llm,
-    tools=[
-        question_answering,
-        create_handoff_tool(agent_name="science_agent"),
-        create_handoff_tool(agent_name="translator_agent"),
-    ],
-    name="question_answering_agent",
-    prompt=(
-        "You are a general question answering agent. "
-        "Route science questions to science_agent and "
-        "translation requests to translator_agent. "
-        "Only answer general knowledge questions."
-    ),
+
+# ---------- INPUT ----------
+user_input = st.text_input(
+    "Message",
+    placeholder="Ask anything...",
+    label_visibility="collapsed"
 )
 
-science_agent = create_react_agent(
-    model=llm,
-    tools=[
-        science_tool,
-        create_handoff_tool(agent_name="question_answering_agent"),
-        create_handoff_tool(agent_name="translator_agent"),
-    ],
-    name="science_agent",
-    prompt=(
-        "You are a science expert. Answer science questions only. "
-        "Route non-science to question_answering_agent and "
-        "translations to translator_agent."
-    ),
-)
 
-translator_agent = create_react_agent(
-    model=llm,
-    tools=[
-        translate_text,
-        create_handoff_tool(agent_name="question_answering_agent"),
-        create_handoff_tool(agent_name="science_agent"),
-    ],
-    name="translator_agent",
-    prompt=(
-        "You are a translation agent. Your main goal is to accurately translate text. "
-        "When the user asks for a translation, your ONLY task is to call the "
-        "'translate_text' tool. "
-        "For the 'request' argument, pass the ENTIRE user message unmodified. "
-        "If the tool requests a target language, return that message directly. "
-        "Route science questions to science_agent and general questions to "
-        "question_answering_agent."
-    ),
-)
+# ---------- BUTTONS ----------
+col1, col2 = st.columns(2)
 
-# -------------------------
-# Swarm & Memory
-# -------------------------
-checkpoint = InMemorySaver()
+with col1:
+    if st.button("Generate Notes", use_container_width=True):
 
-workflow = create_swarm(
-    agents=[
-        question_answering_agent,
-        science_agent,
-        translator_agent
-    ],
-    default_active_agent="question_answering_agent",
-)
+        if user_input:
 
-app = workflow.compile(checkpointer=checkpoint)
+            st.session_state.messages.append(
+                {"role": "user", "content": user_input}
+            )
 
-# -------------------------
-# Save graph
-# -------------------------
-image = app.get_graph().draw_mermaid_png()
-with open("swarm.png", "wb") as f:
-    f.write(image)
+            with st.spinner("Generating Notes..."):
+                response = run_notes(user_input, "Detailed Notes")
 
-# -------------------------
-# Run
-# -------------------------
-config = {"configurable": {"thread_id": "1"}}
+            st.session_state.messages.append(
+                {"role": "bot", "content": response}
+            )
 
-while True:
-    user_input = input("\nEnter your request (or 'exit'): ")
+            st.rerun()
 
-    if user_input.lower() == "exit":
-        print("Goodbye!")
-        break
 
-    result = app.invoke(
-        {"messages": [{"role": "user", "content": user_input}]},
-        config,
-    )
+with col2:
+    if st.button("Generate Questions", use_container_width=True):
 
-    for m in result["messages"]:
-        print(m.pretty_print())
+        if user_input:
+
+            st.session_state.messages.append(
+                {"role": "user", "content": user_input}
+            )
+
+            with st.spinner("Generating Questions..."):
+                response = run_questions(user_input, "MCQs", 10)
+
+            st.session_state.messages.append(
+                {"role": "bot", "content": response}
+            )
+
+            st.rerun()
