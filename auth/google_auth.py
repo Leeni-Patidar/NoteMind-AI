@@ -2,9 +2,13 @@ import streamlit as st
 from google_auth_oauthlib.flow import Flow
 import google.auth.transport.requests
 import requests
+import os
+from dotenv import load_dotenv
 
-CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID"
-CLIENT_SECRET = "YOUR_GOOGLE_CLIENT_SECRET"
+load_dotenv()
+
+CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 REDIRECT_URI = "http://localhost:8501"
 
 def google_login():
