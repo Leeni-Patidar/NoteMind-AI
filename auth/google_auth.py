@@ -7,7 +7,7 @@ load_dotenv()
 
 CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-REDIRECT_URI = "http://localhost:8501"
+REDIRECT_URI = os.getenv("REDIRECT_URI")
 
 def google_login():
     params = {
