@@ -5,10 +5,23 @@ from llm.ollama_llm import ollama_llm
 search_tool = DuckDuckGoSearchTool()
 
 research_agent = Agent(
-    role="Research Agent",
-    goal="Search internet and collect educational content",
-    backstory="Expert researcher who finds accurate study material",
+    role="Research Specialist",
+
+    goal="""
+    Gather accurate, relevant, and concise information about a given topic.
+    Focus on key concepts, definitions, and important points only.
+    """,
+
+    backstory="""
+    You are an expert academic researcher.
+    You extract only the most useful and relevant study material
+    from reliable sources and avoid unnecessary details.
+    """,
+
     tools=[search_tool],
+
     llm=ollama_llm,
-    verbose=True
+
+    verbose=False,  
+    allow_delegation=False
 )

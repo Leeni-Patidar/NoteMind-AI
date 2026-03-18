@@ -1,8 +1,14 @@
 import json
 from config import HISTORY_FILE
+import os
 
 
 def save_history(user, query, result):
+
+    # create file if not exists
+    if not os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, "w") as f:
+            json.dump({}, f)
 
     try:
         with open(HISTORY_FILE, "r") as f:
@@ -19,16 +25,17 @@ def save_history(user, query, result):
     })
 
     with open(HISTORY_FILE, "w") as f:
-        json.dump(data, f)
+        json.dump(data, f, indent=4)
 
 
 def load_history(user):
 
+    if not os.path.exists(HISTORY_FILE):
+        return []
+
     try:
         with open(HISTORY_FILE, "r") as f:
             data = json.load(f)
-
             return data.get(user, [])
-
     except:
         return []
