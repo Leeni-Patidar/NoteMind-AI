@@ -6,3 +6,4 @@ duckduckgo-search
 python-docx
 reportlab
 bcrypt
+litellm
