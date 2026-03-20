@@ -90,6 +90,11 @@ st.markdown(
         background: rgba(10, 15, 26, 0.9) !important;
     }
 
+    .stSidebar h3,
+    .stSidebar .streamlit-expanderHeader {
+        color: #ffffff !important;
+    }
+
     .glass {
         background: var(--card-bg);
         backdrop-filter: blur(18px);
@@ -205,6 +210,34 @@ if not st.session_state.user:
 
     st.stop()
 
+# ================= AUTHENTICATED PAGE STYLE OVERRIDE =================
+# Apply a white page background only after login, without changing premium landing style.
+if st.session_state.user:
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background: #ffffff !important;
+            color: #0a0f1a !important;
+        }
+
+        .css-1d391kg, .css-eth8g3 { /* streamlit main content and padding containers */
+            background: #ffffff !important;
+        }
+
+        .stAlert, .stInfo, .stSuccess, .stWarning, .stError {
+            border-radius: 12px !important;
+        }
+
+        .stChatMessage>div {
+            color: #0a0f1a !important;
+        }
+
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 # ================= MODE RESET =================
 if st.session_state.mode != st.session_state.last_mode:
     st.session_state.pending_action = None
@@ -280,17 +313,6 @@ elif st.session_state.mode == "questions":
 
 else:
     st.warning("⚠️ Please select a mode from sidebar")
-
-# ================= PROJECT HIGHLIGHTS =================
-with st.expander("🚀 Project Highlights", expanded=True):
-    st.markdown(
-        """
-        - **Multi-Agent Workflow**: Choose between Notes, Questions, or Doubt sessions.
-        - **Persistent History**: Your queries and results are saved per user.
-        - **Export to Word**: Download the latest response as a `.docx` file.
-        - **Lightweight & Local**: Runs locally; no external APIs required.
-        """
-    )
 
 # ================= CHAT =================
 for chat in st.session_state.chat_history:
