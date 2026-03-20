@@ -3,57 +3,11 @@ os.environ["CREWAI_DISABLE_TELEMETRY"] = "true"
 
 import streamlit as st
 from agents.crew_setup import run_notes, run_questions
-from auth.google_auth import google_login, get_user_info, logout
+from auth.local_auth import register_user, login_user, logout
 from utils.history_manager import save_history, load_history
 from tools.docx_export import export_docx
 
-
 st.set_page_config(page_title="NoteMind AI", layout="wide")
-
-# ================= CSS =================
-st.markdown("""
-<style>
-.block-container {padding-top: 1rem;}
-header {visibility: hidden;}
-.stApp {background-color: #f8fafc;}
-
-.main-title {
-    font-size: 42px;
-    font-weight: 700;
-    text-align: center;
-}
-.subtitle {
-    text-align: center;
-    color: gray;
-    margin-bottom: 20px;
-}
-
-.chat-bubble-user {
-    background: #2563eb;
-    color: white;
-    padding: 10px;
-    border-radius: 10px;
-    margin-bottom: 5px;
-    text-align: right;
-}
-
-.chat-bubble-bot {
-    background: white;
-    padding: 10px;
-    border-radius: 10px;
-    margin-bottom: 15px;
-}
-
-.mode-box {
-    background: white;
-    padding: 15px;
-    border-radius: 10px;
-    border-left: 6px solid #2563eb;
-    margin-bottom: 20px;
-    font-weight: 500;
-}
-</style>
-""", unsafe_allow_html=True)
 
 # ================= SESSION =================
 defaults = {
@@ -63,135 +17,200 @@ defaults = {
     "mode": None,
     "pending_action": None,
     "topic_input": "",
-    "last_mode": None
+    "last_mode": None,
+    "auth_mode": "login"
 }
 
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ================= MODE RESET FIX =================
-if st.session_state.mode != st.session_state.last_mode:
-    st.session_state.pending_action = None
-    st.session_state.topic_input = ""
-    st.session_state.chat_history = []   # ✅ CLEAR OLD UI
-    st.session_state.last_mode = st.session_state.mode
-
-# ================= LOGIN =================
-if "user_email" in st.query_params and st.session_state.user is None:
-    st.session_state.user = {
-        "email": st.query_params["user_email"],
-        "name": st.query_params.get("user_name", "User")
-    }
+# Ensure history is loaded when a user is already signed in (e.g., after a rerun)
+if st.session_state.user and not st.session_state.history:
     st.session_state.history = load_history(st.session_state.user["email"])
 
-if "code" in st.query_params and st.session_state.user is None:
-    user = get_user_info(st.query_params["code"])
-    if user:
-        st.session_state.user = user
-        st.session_state.history = load_history(user["email"])
-        st.query_params["user_email"] = user["email"]
-        st.query_params["user_name"] = user["name"]
-        st.query_params.pop("code")
-        st.rerun()
-
-# ================= LANDING PAGE =================
-if not st.session_state.user:
-
-    auth_url = google_login()
-
-    st.markdown("""
+# ================= GLOBAL STYLING =================
+# Apply a consistent, modern theme for both the landing page and main app.
+st.markdown(
+    """
     <style>
+    :root {
+        --bg1: #0a0f1a;
+        --bg2: #111b2d;
+        --card-bg: rgba(255,255,255,0.08);
+        --text: #e2e8f0;
+        --muted: #a1aabf;
+        --accent: #38bdf8;
+        --accent2: #6366f1;
+        --border: rgba(255,255,255,0.12);
+        --shadow: 0 12px 24px rgba(0,0,0,0.35);
+    }
+
     .stApp {
-        background: linear-gradient(135deg, #0f172a, #1e3a8a);
-        color: white;
+        background: radial-gradient(circle at top, var(--accent), var(--bg1) 55%, var(--bg2));
+        color: var(--text);
     }
-    .hero-title {
-        font-size: 60px;
-        font-weight: 700;
-        color: #38bdf8;
+
+    .stButton>button, .stDownloadButton>button {
+        background: rgba(255,255,255,0.08) !important;
+        color: var(--text) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 12px !important;
+        padding: 0.65rem 1.1rem !important;
     }
-    .hero-subtitle {
-        font-size: 22px;
-        color: #cbd5e1;
-        margin-top: 15px;
+
+    .stButton>button:hover, .stDownloadButton>button:hover {
+        background: rgba(255,255,255,0.12) !important;
     }
-    .hero-desc {
-        color: #94a3b8;
-        margin-top: 15px;
-        line-height: 1.6;
+
+   /* 🔥 Input text black */
+    .stTextInput input,
+    .stTextArea textarea {
+        background: rgba(255,255,255,0.85) !important;  /* thoda light bg for contrast */
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important; /* Chrome fix */
+        border: 1px solid rgba(0,0,0,0.2) !important;
+        border-radius: 14px !important;
     }
+
+    /* 🔥 Label (Name, Password, Email) black + bigger */
+    .stTextInput label,
+    .stTextArea label {
+        color: #000000 !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+    }
+
+    /* 🔥 Placeholder */
+    .stTextInput input::placeholder {
+        color: #555 !important;
+    }
+
+    .stSidebar {
+        background: rgba(10, 15, 26, 0.9) !important;
+    }
+
+    .glass {
+        background: var(--card-bg);
+        backdrop-filter: blur(18px);
+        padding: 36px;
+        border-radius: 22px;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+    }
+
+    .title {
+        font-size: 58px;
+        font-weight: 800;
+        background: linear-gradient(90deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0;
+    }
+
+    .subtitle {
+        color: var(--muted);
+        margin: 12px 0 30px;
+    }
+
+    .feature-list {
+        margin-top: 20px;
+        padding-left: 20px;
+        color: var(--muted);
+    }
+
+    .feature-list li {
+        margin: 10px 0;
+    }
+
     .feature-card {
-        background: rgba(255,255,255,0.08);
-        padding: 30px;
-        border-radius: 15px;
-        text-align: center;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 16px;
+        padding: 18px;
+        margin-top: 18px;
+        box-shadow: rgba(0, 0, 0, 0.25) 0px 10px 25px;
     }
+
     </style>
-    """, unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ================= PREMIUM LANDING =================
+if not st.session_state.user:
 
     col1, col2 = st.columns([1.2, 1])
 
     with col1:
-        st.markdown('<div class="hero-title">NoteMind AI</div>', unsafe_allow_html=True)
-        st.markdown('<div class="hero-subtitle">Multi-Agent Education System</div>', unsafe_allow_html=True)
-        st.markdown('<div class="hero-desc">Our AI-powered agents generate concise notes, in-depth notes, bullet points, short questions, long questions, and multiple-choice quizzes instantly..</div>', unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown('<div class="title">NoteMind AI</div>', unsafe_allow_html=True)
+        st.markdown('<div class="subtitle">Multi-Agent Learning System</div>', unsafe_allow_html=True)
 
-        # Custom Styled Login Button
-        st.markdown(f"""
-        <a href="{auth_url}" target="_self">
-            <button class="login-btn">Login with Google</button>
-        </a>
-
-        <style>
-        .login-btn {{
-            background: linear-gradient(145deg, #2563eb, #1d4ed8);
-            border: 2px solid #1e40af;
-            color: white;
-            padding: 12px 28px;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }}
-
-        .login-btn:hover {{
-            background: linear-gradient(145deg, #1d4ed8, #1e40af);
-            color: white !important;
-            transform: translateY(-2px);
-        }}
-        </style>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            '<div class="feature-card">'
+            '<h4 style="margin: 0 0 10px;">What can NoteMind AI do?</h4>'
+            '<ul class="feature-list">'
+            '<li>✅ Generate notes, questions, and clear doubts quickly</li>'
+            '<li>✅ Save your history and continue where you left off</li>'
+            '<li>✅ Export results to Word (.docx)</li>'
+            '<li>✅ Built with modular multi-agent architecture</li>'
+            '</ul>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
 
     with col2:
-        image_path = os.path.join(os.getcwd(), "landing_page.png")
-        if os.path.exists(image_path):
-            st.image(image_path, width=400)
+        st.markdown('<div class="glass">', unsafe_allow_html=True)
+
+        if st.session_state.auth_mode == "login":
+            st.subheader("Login")
+
+            name = st.text_input("Name")
+            password = st.text_input("Password", type="password")
+
+            if st.button("Login"):
+                success, user = login_user(name, password)
+                if success:
+                    st.session_state.user = user
+                    st.session_state.history = load_history(user["email"])
+                    st.rerun()
+                else:
+                    st.error("Invalid credentials")
+
+            if st.button("Go to Register"):
+                st.session_state.auth_mode = "register"
+                st.rerun()
+
         else:
-            st.warning("Place 'landing_page.png' in project root folder.")
+            st.subheader("Register")
 
-    st.markdown("<br><br>", unsafe_allow_html=True)
+            name = st.text_input("Name", key="reg_name")
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password", key="reg_pass")
 
-    f1, f2, f3 = st.columns(3)
+            if st.button("Register"):
+                success, msg = register_user(name, email, password)
+                if success:
+                    st.success(msg)
+                    st.session_state.auth_mode = "login"
+                else:
+                    st.error(msg)
 
-    with f1:
-        st.markdown('<div class="feature-card"><img src="https://cdn-icons-png.flaticon.com/512/3135/3135755.png" width="60"><br><br><b>Smart Notes</b><br><br>AI agents generate short notes, detailed explanations, and structured bullet points instantly.</div>', unsafe_allow_html=True)
+            if st.button("Back to Login"):
+                st.session_state.auth_mode = "login"
+                st.rerun()
 
-    with f2:
-        st.markdown('<div class="feature-card"><img src="https://cdn-icons-png.flaticon.com/512/4712/4712109.png" width="60"><br><br><b>AI Question Generator</b><br><br>Automatically creates MCQs, short-answer, and long-answer questions for assessments.</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    with f3:
-        st.markdown('<div class="feature-card"><img src="https://cdn-icons-png.flaticon.com/512/4149/4149684.png" width="60"><br><br><b>Multi-Agent System</b><br><br>Specialized AI agents collaborate to deliver accurate, structured, and high-quality results.</div>', unsafe_allow_html=True)
-        st.stop()
+    st.stop()
 
-# ================= TOP BAR =================
-col1, col2 = st.columns([10,1])
-with col2:
-    first_letter = st.session_state.user["email"][0].upper()
-    st.markdown(f'<div class="avatar">{first_letter}</div>', unsafe_allow_html=True)
-
-
+# ================= MODE RESET =================
+if st.session_state.mode != st.session_state.last_mode:
+    st.session_state.pending_action = None
+    st.session_state.topic_input = ""
+    st.session_state.chat_history = []
+    st.session_state.last_mode = st.session_state.mode
 
 # ================= SIDEBAR =================
 def switch_mode(new_mode):
@@ -201,8 +220,9 @@ def switch_mode(new_mode):
     st.rerun()
 
 with st.sidebar:
-    st.markdown("## 📘 NoteMind")
+    st.success(f"👤 {st.session_state.user['name']}")
 
+    # ✅ NEW CHAT
     if st.button("➕ New Chat"):
         st.session_state.chat_history = []
         st.session_state.pending_action = None
@@ -210,6 +230,7 @@ with st.sidebar:
 
     st.divider()
 
+    # ✅ MODES
     if st.button("🧠 Doubt Session"):
         switch_mode("doubt")
 
@@ -220,46 +241,61 @@ with st.sidebar:
         switch_mode("questions")
 
     st.divider()
-    st.subheader("History")
 
-    for i, item in enumerate(st.session_state.history[::-1]):
-        if st.button(item["query"][:30], key=f"hist_{i}"):
-            st.session_state.chat_history.append({
-                "user": item["query"],
-                "bot": item["result"]
-            })
-            st.rerun()
+    # ✅ HISTORY
+    st.subheader("🕘 History")
+
+    # Display history with stable keys so buttons remain consistent across reruns
+    history = st.session_state.history or []
+    if not history:
+        st.info("No history yet. Your past queries will appear here.")
+    else:
+        for idx in range(len(history) - 1, -1, -1):
+            item = history[idx]
+            if st.button(item["query"][:25], key=f"hist_{idx}"):
+                st.session_state.chat_history.append({
+                    "user": item["query"],
+                    "bot": item["result"]
+                })
+                st.rerun()
 
     st.divider()
-    st.write(f"👤 {st.session_state.user['name']}")
 
     if st.button("Logout"):
         logout()
-        st.session_state.clear()
-        st.query_params.clear()
         st.rerun()
 
 # ================= MAIN =================
-st.markdown('<div class="main-title">NoteMind AI</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">What’s in your mind today?</div>', unsafe_allow_html=True)
+st.markdown("## 🧠 NoteMind AI")
 
-# ================= MODE DISPLAY =================
+# ✅ MODE TAGLINE
 if st.session_state.mode == "doubt":
-    st.markdown('<div class="mode-box">🧠 Doubt Session: Ask anything.</div>', unsafe_allow_html=True)
+    st.info("🧠 Doubt Session: Ask anything freely!")
 
 elif st.session_state.mode == "notes":
-    st.markdown('<div class="mode-box">📝 Notes Mode</div>', unsafe_allow_html=True)
+    st.info("📝 Notes Mode: Generate structured notes")
 
 elif st.session_state.mode == "questions":
-    st.markdown('<div class="mode-box">❓ Questions Mode</div>', unsafe_allow_html=True)
+    st.info("❓ Questions Mode: Create questions instantly")
 
 else:
-    st.warning("⚠️ Select a mode")
+    st.warning("⚠️ Please select a mode from sidebar")
+
+# ================= PROJECT HIGHLIGHTS =================
+with st.expander("🚀 Project Highlights", expanded=True):
+    st.markdown(
+        """
+        - **Multi-Agent Workflow**: Choose between Notes, Questions, or Doubt sessions.
+        - **Persistent History**: Your queries and results are saved per user.
+        - **Export to Word**: Download the latest response as a `.docx` file.
+        - **Lightweight & Local**: Runs locally; no external APIs required.
+        """
+    )
 
 # ================= CHAT =================
 for chat in st.session_state.chat_history:
-    st.markdown(f'<div class="chat-bubble-user">🧑 {chat["user"]}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="chat-bubble-bot">🤖 {chat["bot"]}</div>', unsafe_allow_html=True)
+    st.chat_message("user").write(chat["user"])
+    st.chat_message("assistant").write(chat["bot"])
 
 # ================= INPUT =================
 user_input = st.chat_input("Type your message...")
@@ -279,34 +315,28 @@ if user_input:
 
     st.rerun()
 
-# ================= ACTION UI =================
+# ================= ACTION =================
 result = None
 
 if st.session_state.pending_action == "notes":
-    st.markdown("### Select Notes Type")
     c1, c2, c3 = st.columns(3)
 
-    if c1.button("Detailed", key="notes_detailed"):
+    if c1.button("Detailed"):
         result = run_notes(st.session_state.topic_input, "Detailed Notes")
-
-    elif c2.button("Short", key="notes_short"):
+    elif c2.button("Short"):
         result = run_notes(st.session_state.topic_input, "Short Notes")
-
-    elif c3.button("Bullet", key="notes_bullet"):
+    elif c3.button("Bullet"):
         result = run_notes(st.session_state.topic_input, "Bullet Points")
 
 elif st.session_state.pending_action == "questions":
-    st.markdown("### Select Question Type")
     c1, c2, c3 = st.columns(3)
 
-    if c1.button("MCQ", key="q_mcq"):
-        result = run_questions(st.session_state.topic_input, "MCQ", 5)
-
-    elif c2.button("Short", key="q_short"):
-        result = run_questions(st.session_state.topic_input, "Short Questions", 5)
-
-    elif c3.button("Long", key="q_long"):
-        result = run_questions(st.session_state.topic_input, "Long Questions", 5)
+    if c1.button("MCQ"):
+        result = run_questions(st.session_state.topic_input, "MCQ", 10)
+    elif c2.button("Short"):
+        result = run_questions(st.session_state.topic_input, "Short Questions", 10)
+    elif c3.button("Long"):
+        result = run_questions(st.session_state.topic_input, "Long Questions", 10)
 
 elif st.session_state.pending_action == "doubt":
     with st.spinner("Thinking..."):
@@ -324,7 +354,7 @@ if result:
         st.session_state.topic_input,
         result
     )
-
+    st.session_state.history = load_history(st.session_state.user["email"])
     st.session_state.pending_action = None
     st.rerun()
 

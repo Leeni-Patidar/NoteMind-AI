@@ -23,3 +23,7 @@ Thumbs.db
 *.log
 *.db
 *.sqlite3
+
+# Ignore database folder files
+database/history_*.json
+user.json
