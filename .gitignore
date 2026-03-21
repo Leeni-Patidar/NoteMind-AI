@@ -26,4 +26,5 @@ Thumbs.db
 
 # Ignore database folder files
 database/history_*.json
-user.json
+users.json
+output.docx
