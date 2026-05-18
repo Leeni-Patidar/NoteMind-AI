@@ -1,9 +1,10 @@
 streamlit
 crewai
 langchain
-ollama
+groq
 duckduckgo-search
 python-docx
 reportlab
 bcrypt
 litellm
+python-dotenv

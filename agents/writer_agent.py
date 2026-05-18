@@ -1,5 +1,5 @@
 from crewai import Agent
-from llm.ollama_llm import ollama_llm
+from llm.groq_llm import groq_llm
 
 writer_agent = Agent(
     role="Educational Content Writer",
@@ -22,7 +22,7 @@ writer_agent = Agent(
     - Easy to understand
     """,
 
-    llm=ollama_llm,
+    llm=groq_llm,
 
     verbose=False,   
     allow_delegation=False

@@ -2,7 +2,7 @@ from crewai import Crew, Task
 from agents.researcher_agent import research_agent
 from agents.rag_agent import rag_agent
 from agents.writer_agent import writer_agent
-import ollama
+from groq import Groq
 from config import LLM_MODEL
 
 
@@ -18,16 +18,15 @@ def run_notes(topic, mode):
         - Concise
         """
 
-        response = ollama.chat(
-            model=LLM_MODEL,
+        client = Groq()
+        response = client.chat.completions.create(
+            model=f"groq/{LLM_MODEL}",
             messages=[{"role": "user", "content": prompt}],
-            options={
-                "temperature": 0.5,
-                "num_predict": 700   # 🔥 LIMIT TOKENS = SPEED BOOST
-            }
+            temperature=0.5,
+            max_tokens=700
         )
 
-        return response["message"]["content"]
+        return response.choices[0].message.content
 
     except Exception as e:
         return f"❌ Error: {str(e)}"
@@ -42,16 +41,15 @@ def run_questions(topic, qtype, number):
         Keep answers short and clear.
         """
 
-        response = ollama.chat(
-            model=LLM_MODEL,
+        client = Groq()
+        response = client.chat.completions.create(
+            model=f"groq/{LLM_MODEL}",
             messages=[{"role": "user", "content": prompt}],
-            options={
-                "temperature": 0.5,
-                "num_predict": 700   # 🔥 SPEED CONTROL
-            }
+            temperature=0.5,
+            max_tokens=700
         )
 
-        return response["message"]["content"]
+        return response.choices[0].message.content
 
     except Exception as e:
         return f"❌ Error: {str(e)}"

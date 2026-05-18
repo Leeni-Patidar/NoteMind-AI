@@ -2,27 +2,19 @@
 📘 Smart Notes
 ❓  Questions
 📝 Summaries
-📄 Downloadable DOCX files
 
 
-It uses a local LLM (Ollama) with an agent-based architecture.
 
-## Project Structure
-- `app.py` – main application entry point  
-- `config.py` – configuration settings for APIs  
-- `agents/` – contains multi-agent logic and task workflows  
-- `llm/` – handles interaction with a language model (e.g., Ollama)  
-- `rag/` – retrieval-augmented generation logic  
-- `auth/` – authentication logic  
-- `database/` – data models and storage logic  
-- `tools/` & `utils/` – helpers & utilities
+It uses Groq API for LLM with an agent-based architecture.
+
+
 - 
 ## Tools Used
 | Component      | Technology         |
 | -------------- | ------------------ |
 | Frontend       | Streamlit          |
 | Backend        | Python             |
-| LLM Runtime    | Ollama             |
+| LLM Runtime    | Groq API           |
 | Architecture   | Multi-Agent System |
 | Retrieval      | RAG                |
 | Authentication | Google OAuth       |
@@ -34,3 +26,7 @@ It uses a local LLM (Ollama) with an agent-based architecture.
 - Install dependencies with:
   ```bash
   pip install -r requirements.txt
+
+## Run Command
+```bash
+$ python -m streamlit run app.py 

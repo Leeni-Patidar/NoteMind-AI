@@ -1,6 +1,6 @@
 from crewai import Agent
 from tools.search_tool import DuckDuckGoSearchTool
-from llm.ollama_llm import ollama_llm
+from llm.groq_llm import groq_llm
 
 search_tool = DuckDuckGoSearchTool()
 
@@ -20,7 +20,7 @@ research_agent = Agent(
 
     tools=[search_tool],
 
-    llm=ollama_llm,
+    llm=groq_llm,
 
     verbose=False,  
     allow_delegation=False
